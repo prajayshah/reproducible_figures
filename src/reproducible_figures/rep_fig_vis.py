@@ -178,6 +178,56 @@ def remove_both_ticklabels(ax):
     remove_xticklabels(ax)
     remove_yticklabels(ax)
 
+def dataplot_ax_options(ax, **kwargs):
+    """
+    Matplotlib axis-level settings for plotting a timeseries dataplot. Primarily used for specifying x and y axis limits, and intervals of x ticks for time series data.
+    :param
+        **kwargs:
+            :x_axis: x axis label, if specify Time or time in x_axis then convert x_axis to time domain
+            :collection_hz: cellsdata collection rate (in Hz)
+            :x_tick_secs: interval (in secs) for plotting x ticks when converting x axis to time domain
+            :xlims: set xlimits for plot
+            :ylims: set ylimits for plot
+
+    """
+    if ax:
+        ax.margins(0)
+        ax.grid(True)
+
+        # set x and y axis limits
+        if 'ylims' in [*kwargs]: ax.set_ylim([ylim for ylim in kwargs['ylims']])
+
+        # set x_axis label
+        if 'x_axis' in [*kwargs]:
+            x_axis = kwargs['x_axis']
+            # change x-axis to time (secs) if time is requested
+            if ('time' in x_axis or 'Time' in x_axis) and 'collection_hz' in [*kwargs]:
+                if 'xlims' in [*kwargs]:
+                    ax.set_xlim([xlim * kwargs['collection_hz'] for xlim in kwargs['xlims']])
+                    x_tick_secs = int((kwargs['xlims'][1] - kwargs['xlims'][0]) // 2) if 'x_tick_secs' not in [*kwargs] else kwargs['x_tick_secs']
+                    labels = list(np.arange(kwargs['xlims'][0], kwargs['xlims'][1], x_tick_secs)) if (kwargs['xlims'][1] - kwargs['xlims'][0]) > x_tick_secs else list(np.arange(kwargs['xlims'][0], kwargs['xlims'][1]))
+                else:
+                    x_tick_secs = 30 if 'x_tick_secs' not in [*kwargs] else kwargs['x_tick_secs']
+                    start, end = 0, ax.get_xlim()[1]
+                    labels = list(
+                        range(0, int(end // kwargs['collection_hz']), x_tick_secs))
+
+                x_tick_locations = [(label * kwargs['collection_hz']) for label in labels]
+                ax.set_xticks(ticks=x_tick_locations)
+
+                ax.set_xticklabels(labels)
+                ax.set_xlabel('Time (secs)')
+            else:
+                if 'xlims' in [*kwargs]: ax.set_xlim([xlim for xlim in kwargs['xlims']])
+                ax.set_xlabel(x_axis)
+
+        # set y_axis label
+        ax.set_ylabel(kwargs['y_axis']) if 'y_axis' in [*kwargs] else None
+
+
+    else:
+        pass
+
 
 ##############################
 ###   SPECIFIC FUNCTIONS FOR THIS TUTORIAL
@@ -301,11 +351,11 @@ def add_scale_bar(ax, loc: tuple, length: Union[tuple, int, float], bartype: str
 def make_fig_layout(layout: dict = None, **kwargs):
     """
     Create the fig and axes object to use for plotting based on a grid layout dictionary which describes the necessary relationships for the layout.
-    :param layout: (name of panel): {'panel_shape': (ncols, nrows, 'twinx' or 'twiny'), 'bound': (l, t, r, b), 'wspace': float, 'hspace': float}
+    :param layout: (name of panel): {'panel_shape': (ncols, nrows, 'twinx' or 'twiny'), 'bound': (left, bottom, right, top), 'wspace': float, 'hspace': float}
 
     layout: dictionary key relates to one panel from within the overall figures. arbitrary number of individual layout dictionaries can be provided as input to create each panel.
         # panel_shape = describes the number and layout of sub-panels; ncols x nrows, twinx or twiny
-        # bound = l, t, r, b
+        # bound = left, bottom, right, top
         # wspace or hspace = space between panels
 
     >>> dpi = 300
@@ -322,12 +372,6 @@ def make_fig_layout(layout: dict = None, **kwargs):
 
     fig = plt.figure(constrained_layout=False,  # False better when customising grids
                      figsize=figsize, dpi=dpi)  # width x height in inches
-
-    # layout = {
-    #     'topleft': {
-    #         'panel_shape': (1,2),
-    #         'bound': (0.05, 0.95, 0.25, 0.8)}
-    # }
 
     axes = {}  # this is the dictionary that will collect *all* axes that are required for this plot, named as per input grid
     grids = {}
